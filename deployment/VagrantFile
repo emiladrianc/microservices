@@ -1,0 +1,81 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+VAGRANTFILE_API_VERSION = "2"
+
+# Box
+
+BOX_UBUNTU = "ubuntu/trusty64"
+ 
+BOX_Ansible				= BOX_UBUNTU
+BOX_ElasticSearchServer = BOX_UBUNTU
+BOX_DataBase			= BOX_UBUNTU
+
+NETWORK		= "192.168.50."
+NETMASK		= "255.255.255.0"
+
+ANSIBLESERVERS = {
+	"ansible" => [NETWORK + "100", BOX_Ansible],
+}
+
+ESSERVERS = {
+	"elasticSearch1" => [NETWORK + "110", BOX_ElasticSearchServer, 9200, 9200], #9200 - forward port on host for elastic search : 9200
+}
+
+
+
+# All Vagrant configuration is done below. The "2" in Vagrant.configure
+# configures the configuration version (we support older styles for
+# backwards compatibility). Please don't change it unless you know what
+# you're doing.
+Vagrant.configure(2) do |config|
+ 	
+	# db server	
+	ESSERVERS.each do | (name, cfg)|
+		ipAddress, box, hostELPort, questELPort = cfg
+		
+		config.vm.define name do |el|
+			
+			el.vm.box = box
+			el.vm.hostname = name
+			
+			el.vm.box_check_update = false
+			#el.vbguest.auto_update = false
+			
+			el.vm.network 'private_network', ip: ipAddress, netmask: NETMASK
+			
+			el.vm.network "forwarded_port", guest: hostELPort, host: questELPort, id: "ElasticSearch"
+						
+			el.vm.post_up_message = name + " is up and running"			
+			
+		end
+	end
+	
+	# Ansible servers
+	ANSIBLESERVERS.each do | (name, cfg)|
+		ipAddress, box = cfg
+		
+		config.vm.define name do |ans|
+			ans.vm.box = box
+			ans.vm.hostname = name
+			
+			ans.vm.network "private_network", ip: ipAddress, netmask: NETMASK
+			
+			#ans.vbguest.auto_update = false
+			
+			#ans.vm.synced_folder ".", "/home/vagrant/"
+			
+			ans.vm.provision "shell", path: "Scripts/Ansible/00_InstallUtils.sh"		
+			ans.vm.provision "shell", path: "Scripts/Ansible/01_InstallAnsible.sh"	
+			ans.vm.provision "shell", path: "Scripts/Ansible/02_ChangePermisionForInventoryFile.sh"				
+			
+			# ans.vm.provision "ansible" do |ansible|
+				# ansible.playbook = "databasePlaybook.yml"
+			# end
+			
+			ans.vm.post_up_message = name + " is up and running"
+			
+		end
+	end
+	
+end
